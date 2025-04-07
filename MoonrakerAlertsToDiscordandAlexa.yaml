@@ -1,37 +1,73 @@
-alias: Send Neptune Max Printer Progress to Discord & Alexa (Moonraker)
-description: monkies code better than AI.
-triggers:
-  - entity_id: sensor.neptune_max_current_print_state
-    from:
-      - idle
-      - standby
-      - completed
-      - error
+blueprint:
+  name: "Neptune Max Printer Notifications"
+  description: >
+    Notify via Discord and Alexa when the printer starts, progresses, pauses, and finishes printing.
+    Includes customizable notification times and camera entities.
+  domain: automation
+  input:
+    main_sensor:
+      name: Main Printer Sensor
+      description: The main sensor for your printer's state (e.g., 'sensor.neptune_max_current_print_state').
+      selector:
+        entity:
+          domain: sensor
+    alexa_notification_entity:
+      name: Alexa Notification Entity
+      description: Your Alexa media player entity for announcements.
+      default: notify.alexa_media_echoclockdot
+      selector:
+        entity:
+          domain: notify
+    time_after:
+      name: Notification Start Time
+      description: The earliest time for Alexa notifications (e.g., 09:00:00).
+      default: "09:00:00"
+      selector:
+        time:
+    time_before:
+      name: Notification End Time
+      description: The latest time for Alexa notifications (e.g., 23:59:00).
+      default: "23:59:00"
+      selector:
+        time:
+    camera_thumbnail:
+      name: Thumbnail Camera
+      description: Camera entity for thumbnail images during job start.
+      selector:
+        entity:
+          domain: camera
+    camera_webcam:
+      name: Webcam Camera
+      description: Camera entity for live images during job progress and other events.
+      selector:
+        entity:
+          domain: camera
+
+trigger:
+  - platform: state
+    entity_id: !input main_sensor
+    from: [idle, standby, completed, error]
     to: printing
     id: started
-    trigger: state
-  - entity_id: sensor.neptune_max_current_print_state
+  - platform: state
+    entity_id: !input main_sensor
     from: paused
     to: printing
     id: resumed
-    trigger: state
-  - entity_id: sensor.neptune_max_progress
+  - platform: state
+    entity_id: "{{ !input main_sensor.split('_')[0] }}_{{ !input main_sensor.split('_')[1] }}_progress"
     id: progress
-    trigger: state
-  - entity_id: sensor.neptune_max_current_print_state
+  - platform: state
+    entity_id: !input main_sensor
     from: printing
-    to:
-      - idle
-      - standby
-      - completed
-      - error
+    to: [idle, standby, completed, error]
     id: finished
-    trigger: state
-  - entity_id: sensor.neptune_max_current_print_state
+  - platform: state
+    entity_id: !input main_sensor
     to: paused
     id: paused
-    trigger: state
-conditions:
+
+condition:
   - condition: or
     conditions:
       - condition: trigger
@@ -43,51 +79,45 @@ conditions:
       - condition: trigger
         id: paused
       - condition: template
-        value_template: >
-          {{ trigger.to_state.state | float % 5 == 0 and trigger.to_state.state
-          | float > 0 and trigger.id == 'progress' }}
+        value_template: "{{ trigger.to_state.state | float % 5 == 0 and trigger.to_state.state | float > 0 and trigger.id == 'progress' }}"
   - condition: template
-    value_template: |
-      {% if trigger.id == 'started' %}
-        {{ not is_state('sensor.neptune_max_current_print_state', 'paused') }}
-      {% else %}
-        true
-      {% endif %}
-actions:
+    value_template: "{% if trigger.id == 'started' %}{{ not is_state(!input main_sensor, 'paused') }}{% else %}true{% endif %}"
+
+action:
   - delay: "00:00:01"
-  - target:
-      entity_id: |
+  - service: camera.snapshot
+    target:
+      entity_id: >
         {% if trigger.id == 'started' %}
-          camera.neptune_max_thumbnail
+          !input camera_thumbnail
         {% else %}
-          camera.neptune_max_webcam
+          !input camera_webcam
         {% endif %}
     data:
       filename: /config/www/3dprinter_snapshot.jpg
-    action: camera.snapshot
   - delay: "00:00:02"
-  - data_template:
-      message: |-
+  - service: shell_command.printer_notify_webhook
+    data_template:
+      message: >-
         {% if trigger.id == 'paused' %}
           ⏸️ Print Job Paused!
         {% elif trigger.id == 'resumed' %}
           🔄 Print Job Resumed!
         {% elif trigger.id == 'started' %}
-          🖨️ Print Job Started! 📄 File: {{ states('sensor.neptune_max_filename') }}
-        {% elif trigger.id == "progress" %}
-          📢 Printing is at {{ states('sensor.neptune_max_progress') | round(0) }}% ETA: {% set total_minutes = (states('sensor.neptune_max_print_time_left') | float * 60) | round %}{% set hours = total_minutes // 60 %}{% set minutes = total_minutes % 60 %}{{ hours }}h {{ minutes }}m | Layer: {{ states('sensor.neptune_max_current_layer') }}/{{ states('sensor.neptune_max_total_layer') }}
+          🖨️ Print Job Started! 📄 File: {{ states(!input main_sensor.split('_')[0] + '_' + !input main_sensor.split('_')[1] + '_filename') }}
+        {% elif trigger.id == 'progress' %}
+          📢 Printing is at {{ states(!input main_sensor.split('_')[0] + '_' + !input main_sensor.split('_')[1] + '_progress') | round(0) }}% ETA: {% set total_minutes = (states(!input main_sensor.split('_')[0] + '_' + !input main_sensor.split('_')[1] + '_print_time_left') | float * 60) | round %}{% set hours = total_minutes // 60 %}{% set minutes = total_minutes % 60 %}{{ hours }}h {{ minutes }}m | Layer: {{ states(!input main_sensor.split('_')[0] + '_' + !input main_sensor.split('_')[1] + '_current_layer') }}/{{ states(!input main_sensor.split('_')[0] + '_' + !input main_sensor.split('_')[1] + '_total_layer') }}
         {% elif trigger.id == 'finished' %}
-          ✅ Print Job Completed! 🧵 Total Filament Used: {{ states('sensor.neptune_max_totals_filament_used') }}m ({{ (states('sensor.neptune_max_totals_filament_used') | float * 0.000621371) | round(2) }} mi) ⏱️ Total Time: {{ states('sensor.neptune_max_totals_print_time') }}
+          ✅ Print Job Completed! 🧵 Total Filament Used: {{ states(!input main_sensor.split('_')[0] + '_' + !input main_sensor.split('_')[1] + '_totals_filament_used') }}m ({{ (states(!input main_sensor.split('_')[0] + '_' + !input main_sensor.split('_')[1] + '_totals_filament_used') | float * 0.000621371) | round(2) }} mi) ⏱️ Total Time: {{ states(!input main_sensor.split('_')[0] + '_' + !input main_sensor.split('_')[1] + '_totals_print_time') }}
         {% endif %}
-    action: shell_command.printer_notify_webhook
   - choose:
       - conditions:
-          - condition: time
-            after: "09:00:00"
-            before: "23:59:00"
+          - condition: template
+            value_template: "{{ now().strftime('%H:%M:%S') >= !input time_after and now().strftime('%H:%M:%S') <= !input time_before }}"
         sequence:
-          - data:
-              message: |-
+          - service: !input alexa_notification_entity
+            data_template:
+              message: >-
                 {% if trigger.id == 'paused' %}
                   Print job paused.
                 {% elif trigger.id == 'resumed' %}
@@ -95,10 +125,10 @@ actions:
                 {% elif trigger.id == 'started' %}
                   Print job started.
                 {% elif trigger.id == 'finished' %}
-                  Print job completed on Neptune 4.
+                  Print job completed on {{ !input main_sensor.split('_')[1] }}.
                 {% endif %}
               data:
                 type: announce
-            action: notify.alexa_media_echoclockdot
+
 mode: queued
 max: 10
