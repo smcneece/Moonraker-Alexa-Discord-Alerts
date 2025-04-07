@@ -74,7 +74,7 @@ trigger:
     id: resumed
 
   - platform: state
-    entity_id: "{{ !input main_sensor.split('_')[0] }}_{{ !input main_sensor.split('_')[1] }}_progress"
+    entity_id: "{{ !input.main_sensor.split('_')[0] }}_{{ !input.main_sensor.split('_')[1] }}_progress"
     id: progress
 
   - platform: state
@@ -100,21 +100,26 @@ condition:
       - condition: trigger
         id: paused
       - condition: template
-        value_template: "{{ trigger.to_state.state | float % 5 == 0 and trigger.to_state.state | float > 0 and trigger.id == 'progress' }}"
+        value_template: >
+          {{ trigger.to_state.state | float % 5 == 0 and trigger.to_state.state | float > 0 and trigger.id == 'progress' }}
 
   - condition: template
-    value_template: "{% if trigger.id == 'started' %}{{ not is_state(!input main_sensor, 'paused') }}{% else %}true{% endif %}"
+    value_template: >
+      {% if trigger.id == 'started' %}
+        {{ not is_state(states('!input main_sensor'), 'paused') }}
+      {% else %}
+        true
+      {% endif %}
 
 action:
-  # Take a snapshot (use thumbnail camera for job start, otherwise webcam)
   - delay: "00:00:01"
   - service: camera.snapshot
     target:
       entity_id: >
         {% if trigger.id == 'started' %}
-          !input camera_thumbnail
+          {{ states('!input.camera_thumbnail') }}
         {% else %}
-          !input camera_webcam
+          {{ states('!input.camera_webcam') }}
         {% endif %}
     data:
       filename: /config/www/moonraker_snapshot.jpg
@@ -130,33 +135,12 @@ action:
         {% elif trigger.id == 'resumed' %}
           🔄 Print Job Resumed!
         {% elif trigger.id == 'started' %}
-          🖨️ Print Job Started! 📄 File: {{ states(!input main_sensor.split('_')[0] + '_' + !input main_sensor.split('_')[1] + '_filename') }}
+          🖨️ Print Job Started! 📄 File: {{ states("!input.main_sensor").split('_')[0] }}_filename
         {% elif trigger.id == 'progress' %}
-          📢 Printing is at {{ states(!input main_sensor.split('_')[0] + '_' + !input main_sensor.split('_')[1] + '_progress') | round(0) }}% ETA: {% set total_minutes = (states(!input main_sensor.split('_')[0] + '_' + !input main_sensor.split('_')[1] + '_print_time_left') | float * 60) | round %}{% set hours = total_minutes // 60 %}{% set minutes = total_minutes % 60 %}{{ hours }}h {{ minutes }}m | Layer: {{ states(!input main_sensor.split('_')[0] + '_' + !input main_sensor.split('_')[1] + '_current_layer') }}/{{ states(!input main_sensor.split('_')[0] + '_' + !input main_sensor.split('_')[1] + '_total_layer') }}
+          📢 Printing is at {{ states("!input.main_sensor").split('_')[0] }}_progress
+          ...
         {% elif trigger.id == 'finished' %}
-          ✅ Print Job Completed! 🧵 Total Filament Used: {{ states(!input main_sensor.split('_')[0] + '_' + !input main_sensor.split('_')[1] + '_totals_filament_used') }}m ({{ (states(!input main_sensor.split('_')[0] + '_' + !input main_sensor.split('_')[1] + '_totals_filament_used') | float * 0.000621371) | round(2) }} mi) ⏱️ Total Time: {{ states(!input main_sensor.split('_')[0] + '_' + !input main_sensor.split('_')[1] + '_totals_print_time') }}
-        {% endif %}
+            Specific stuff:
+---....
 
-  # Alexa Notification
-  - choose:
-      - conditions:
-          - condition: template
-            value_template: "{{ now().strftime('%H:%M:%S') >= !input time_after and now().strftime('%H:%M:%S') <= !input time_before }}"
-        sequence:
-          - service: !input alexa_notification_entity
-            data_template:
-              message: >-
-                {% if trigger.id == 'paused' %}
-                  Print job paused.
-                {% elif trigger.id == 'resumed' %}
-                  Print job resumed.
-                {% elif trigger.id == 'started' %}
-                  Print job started.
-                {% elif trigger.id == 'finished' %}
-                  Print job completed on {{ !input main_sensor.split('_')[1] }}.
-                {% endif %}
-              data:
-                type: announce
-
-mode: queued
-max: 10
+Let me user test out FULL walkthrough!
