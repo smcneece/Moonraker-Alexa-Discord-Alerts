@@ -1,4 +1,5 @@
-# 🧙‍♂️ Moonraker Printer Discord & Alexa Notifications (Home Assistant Automation)
+# 🧙‍♂️ THIS BLUEPRINT IS NOT READY FOR USER TESTING. 
+  Moonraker Printer Discord & Alexa Notifications (Home Assistant Automation)
 
 ## ✅ Features
 - 🖼️ Snapshot images posted to Discord if available (based on slicer’s g-code setup)
