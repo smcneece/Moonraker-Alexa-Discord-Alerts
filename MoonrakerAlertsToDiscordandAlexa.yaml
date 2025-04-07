@@ -7,38 +7,48 @@ blueprint:
   input:
     main_sensor:
       name: Main Printer Sensor
-      description: The main sensor for your printer's state (e.g., 'sensor.neptune_max_current_print_state').
+      description: >
+        The main sensor for your printer's state (e.g., 'sensor.neptune_max_current_print_state').
+        Example: `sensor.neptune_max_current_print_state`.
       selector:
         entity:
           domain: sensor
     alexa_notification_entity:
       name: Alexa Notification Entity
-      description: Your Alexa media player entity for announcements.
+      description: >
+        Your Alexa media player entity for announcements.
+        Example: `notify.alexa_media_echo`.
       default: notify.alexa_media_echoclockdot
       selector:
         entity:
           domain: notify
     time_after:
       name: Notification Start Time
-      description: The earliest time for Alexa notifications (e.g., 09:00:00).
+      description: >
+        The earliest time for Alexa notifications (e.g., 09:00:00).
       default: "09:00:00"
       selector:
         time:
     time_before:
       name: Notification End Time
-      description: The latest time for Alexa notifications (e.g., 23:59:00).
+      description: >
+        The latest time for Alexa notifications (e.g., 23:59:00).
       default: "23:59:00"
       selector:
         time:
     camera_thumbnail:
       name: Thumbnail Camera
-      description: Camera entity for thumbnail images during job start.
+      description: >
+        Camera entity for thumbnail images during job start. 
+        Example: `camera.neptune_max_thumbnail`.
       selector:
         entity:
           domain: camera
     camera_webcam:
       name: Webcam Camera
-      description: Camera entity for live images during job progress and other events.
+      description: >
+        Camera entity for live images during job progress and other events. 
+        Example: `camera.neptune_max_webcam`.
       selector:
         entity:
           domain: camera
@@ -104,31 +114,4 @@ action:
         {% elif trigger.id == 'resumed' %}
           🔄 Print Job Resumed!
         {% elif trigger.id == 'started' %}
-          🖨️ Print Job Started! 📄 File: {{ states(!input main_sensor.split('_')[0] + '_' + !input main_sensor.split('_')[1] + '_filename') }}
-        {% elif trigger.id == 'progress' %}
-          📢 Printing is at {{ states(!input main_sensor.split('_')[0] + '_' + !input main_sensor.split('_')[1] + '_progress') | round(0) }}% ETA: {% set total_minutes = (states(!input main_sensor.split('_')[0] + '_' + !input main_sensor.split('_')[1] + '_print_time_left') | float * 60) | round %}{% set hours = total_minutes // 60 %}{% set minutes = total_minutes % 60 %}{{ hours }}h {{ minutes }}m | Layer: {{ states(!input main_sensor.split('_')[0] + '_' + !input main_sensor.split('_')[1] + '_current_layer') }}/{{ states(!input main_sensor.split('_')[0] + '_' + !input main_sensor.split('_')[1] + '_total_layer') }}
-        {% elif trigger.id == 'finished' %}
-          ✅ Print Job Completed! 🧵 Total Filament Used: {{ states(!input main_sensor.split('_')[0] + '_' + !input main_sensor.split('_')[1] + '_totals_filament_used') }}m ({{ (states(!input main_sensor.split('_')[0] + '_' + !input main_sensor.split('_')[1] + '_totals_filament_used') | float * 0.000621371) | round(2) }} mi) ⏱️ Total Time: {{ states(!input main_sensor.split('_')[0] + '_' + !input main_sensor.split('_')[1] + '_totals_print_time') }}
-        {% endif %}
-  - choose:
-      - conditions:
-          - condition: template
-            value_template: "{{ now().strftime('%H:%M:%S') >= !input time_after and now().strftime('%H:%M:%S') <= !input time_before }}"
-        sequence:
-          - service: !input alexa_notification_entity
-            data_template:
-              message: >-
-                {% if trigger.id == 'paused' %}
-                  Print job paused.
-                {% elif trigger.id == 'resumed' %}
-                  Print job resumed.
-                {% elif trigger.id == 'started' %}
-                  Print job started.
-                {% elif trigger.id == 'finished' %}
-                  Print job completed on {{ !input main_sensor.split('_')[1] }}.
-                {% endif %}
-              data:
-                type: announce
-
-mode: queued
-max: 10
+          🖨️ Print Job Started! 📄 File: {{ states(!input main_sensor.split('_')[0] +
